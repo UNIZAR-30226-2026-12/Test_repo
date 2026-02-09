@@ -1,0 +1,5 @@
+{
+  "name": " Reversi",
+  "description": "A fully functional Reversi (Othello) game with a built-in Minimax AI. The game logic and AI, originally requested as a backend, are implemented directly in the browser for immediate playability and zero latency.",
+  "requestFramePermissions": []
+}
