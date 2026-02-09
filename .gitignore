@@ -22,3 +22,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Antigravity & Environment
+.agent/
+__pycache__/
+start.bat
