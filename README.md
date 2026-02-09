@@ -1,54 +1,48 @@
-# Reversi (Othello) con IA Minimax
+# Reversi (Othello) con IA Backend (Python)
 
-Este proyecto es una implementación completa del juego de mesa Reversi (Othello). Cuenta con una arquitectura híbrida única que permite jugar tanto conectado a un backend de Python como en modo totalmente offline en el navegador.
+Este proyecto es un juego de Reversi que utiliza un motor de Inteligencia Artificial (Minimax con Poda Alfa-Beta) ejecutado en un backend robusto de Python.
 
-**IMPORTANTE:** Este proyecto **NO** requiere ninguna API Key de Google ni servicios de terceros. La inteligencia artificial es un algoritmo lógico (Minimax con poda Alfa-Beta) que se ejecuta localmente.
+**NOTA CRÍTICA:** A diferencia de otras versiones, este frontend **no tiene lógica de juego local**. Requiere obligatoriamente que el servidor de Python esté activo para funcionar.
 
 ## Tecnologías
 
 - **Frontend:** React, TypeScript, Tailwind CSS.
-- **Backend:** Python, FastAPI, Pydantic.
-- **IA:** Algoritmo Minimax con Poda Alfa-Beta (implementado tanto en Python como en TypeScript para redundancia).
+- **Backend:** Python 3.x, FastAPI, Uvicorn.
+- **IA:** Algoritmo Minimax implementado en el lado del servidor.
 
 ## Cómo ejecutar el proyecto
 
-### 1. Frontend (La interfaz del juego)
+### 1. Iniciar el Backend (Obligatorio)
 
-Para iniciar la aplicación web:
-
-```bash
-# Instalar dependencias de Node.js
-npm install
-
-# Iniciar el servidor de desarrollo
-npm run dev
-```
-
-Abre tu navegador en `http://localhost:5173` (o el puerto que indique la consola).
-
-*Nota: Si solo ejecutas este paso, el juego funcionará en "Modo Offline" usando la IA integrada en el navegador.*
-
-### 2. Backend (Lógica en Python) - Opcional
-
-Si deseas que la lógica y la IA sean procesadas por el servidor de Python (como se solicitó originalmente):
-
-1. Asegúrate de tener Python instalado.
-2. Instala las dependencias necesarias:
+Primero, debes ejecutar el servidor de Python. Asegúrate de tener las dependencias instaladas:
 
 ```bash
 pip install fastapi uvicorn pydantic
 ```
 
-3. Ejecuta el servidor:
+Luego, inicia el servidor:
 
 ```bash
 uvicorn backend:app --reload
 ```
 
-El servidor correrá en `http://localhost:8000`.
+El servidor debe estar corriendo en `http://localhost:8000`.
 
-## ¿Cómo funciona la conexión?
+### 2. Iniciar el Frontend
 
-El Frontend está programado para intentar conectarse automáticamente a `http://localhost:8000`. 
-- Si el backend de Python está activo, las jugadas se procesan allí.
-- Si el backend NO está activo (o falla la conexión), el juego cambia silenciosamente a la lógica interna de TypeScript (Modo Offline) para que puedas seguir jugando sin interrupciones.
+En otra terminal, inicia la interfaz de usuario:
+
+```bash
+npm install
+npm run dev
+```
+
+Abre `http://localhost:5173`. Si el backend está apagado, verás una pantalla de advertencia roja y el juego no permitirá realizar movimientos.
+
+## Arquitectura
+
+El flujo de juego es:
+1. El usuario realiza un clic.
+2. El frontend envía las coordenadas al endpoint `/movimiento`.
+3. El backend valida el movimiento del jugador, aplica los flanqueos y ejecuta inmediatamente la mejor respuesta de la IA.
+4. El backend devuelve el estado final del tablero tras ambos turnos.

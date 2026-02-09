@@ -7,7 +7,7 @@ import copy
 
 app = FastAPI(title="Reversi AI Backend")
 
-# Habilitar CORS para comunicación con el frontend
+# Habilitar CORS para permitir peticiones desde el frontend
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -22,7 +22,6 @@ Cell = Optional[Player]
 Board = List[List[Cell]]
 BOARD_SIZE = 8
 
-# Pesos de posición para evaluación heurística
 POSITION_WEIGHTS = [
     [100, -20, 10, 5, 5, 10, -20, 100],
     [-20, -50, -2, -2, -2, -2, -50, -20],
@@ -40,15 +39,21 @@ DIRECTIONS = [
     (1, -1),  (1, 0),  (1, 1)
 ]
 
-# --- Modelos ---
+# --- Modelos de Datos ---
 
-class GameState(BaseModel):
+class Coordinate(BaseModel):
+    row: int
+    col: int
+
+class GameStateResponse(BaseModel):
     game_id: str
     board: Board
-    current_player: Optional[Player] # None si el juego terminó
-    winner: Optional[str] # 'black', 'white', 'draw', None
+    current_player: Optional[Player]
+    winner: Optional[str]
     game_over: bool
     score: Dict[str, int]
+    valid_moves: List[Coordinate]
+    last_move: Optional[Coordinate] = None
 
 class MoveRequest(BaseModel):
     game_id: str
@@ -56,10 +61,10 @@ class MoveRequest(BaseModel):
     col: int
     player: Player
 
-# --- Almacenamiento en Memoria ---
-games_db: Dict[str, GameState] = {}
+# --- DB en memoria ---
+games_db: Dict[str, GameStateResponse] = {}
 
-# --- Funciones de Lógica del Juego ---
+# --- Lógica de Juego ---
 
 def create_initial_board() -> Board:
     board = [[None for _ in range(BOARD_SIZE)] for _ in range(BOARD_SIZE)]
@@ -73,236 +78,175 @@ def create_initial_board() -> Board:
 def is_on_board(r: int, c: int) -> bool:
     return 0 <= r < BOARD_SIZE and 0 <= c < BOARD_SIZE
 
-def get_valid_moves(board: Board, player: Player) -> List[Tuple[int, int]]:
+def get_valid_moves(board: Board, player: Player) -> List[Coordinate]:
     moves = []
+    if not player: return moves
     for r in range(BOARD_SIZE):
         for c in range(BOARD_SIZE):
             if is_valid_move(board, player, r, c):
-                moves.append((r, c))
+                moves.append(Coordinate(row=r, col=c))
     return moves
 
 def is_valid_move(board: Board, player: Player, row: int, col: int) -> bool:
-    if board[row][col] is not None:
-        return False
-    
+    if board[row][col] is not None: return False
     opponent = 'white' if player == 'black' else 'black'
-    
     for dr, dc in DIRECTIONS:
         r, c = row + dr, col + dc
         found_opponent = False
-        
         while is_on_board(r, c):
             cell = board[r][c]
-            if cell == opponent:
-                found_opponent = True
+            if cell == opponent: found_opponent = True
             elif cell == player:
-                if found_opponent:
-                    return True
+                if found_opponent: return True
                 break
-            else: # celda vacía
-                break
+            else: break
             r += dr
             c += dc
-            
     return False
 
 def apply_move(board: Board, player: Player, row: int, col: int) -> Board:
     new_board = copy.deepcopy(board)
     new_board[row][col] = player
     opponent = 'white' if player == 'black' else 'black'
-
     for dr, dc in DIRECTIONS:
         r, c = row + dr, col + dc
         to_flip = []
         while is_on_board(r, c):
             cell = new_board[r][c]
-            if cell == opponent:
-                to_flip.append((r, c))
+            if cell == opponent: to_flip.append((r, c))
             elif cell == player:
-                for fr, fc in to_flip:
-                    new_board[fr][fc] = player
+                for fr, fc in to_flip: new_board[fr][fc] = player
                 break
-            else:
-                break
+            else: break
             r += dr
             c += dc
     return new_board
 
 def count_score(board: Board) -> Dict[str, int]:
-    black = sum(row.count('black') for row in board)
-    white = sum(row.count('white') for row in board)
-    return {"black": black, "white": white}
+    return {
+        "black": sum(row.count('black') for row in board),
+        "white": sum(row.count('white') for row in board)
+    }
 
-# --- Lógica de IA (Minimax + Poda Alfa-Beta) ---
+# --- Motor IA ---
 
 def evaluate_board(board: Board, player: Player) -> int:
     opponent = 'white' if player == 'black' else 'black'
     score = 0
-    
     counts = count_score(board)
-    total_discs = counts['black'] + counts['white']
-    
-    # Pesos posicionales
     for r in range(BOARD_SIZE):
         for c in range(BOARD_SIZE):
-            if board[r][c] == player:
-                score += POSITION_WEIGHTS[r][c]
-            elif board[r][c] == opponent:
-                score -= POSITION_WEIGHTS[r][c]
+            if board[r][c] == player: score += POSITION_WEIGHTS[r][c]
+            elif board[r][c] == opponent: score -= POSITION_WEIGHTS[r][c]
     
-    # Movilidad
     my_moves = len(get_valid_moves(board, player))
     op_moves = len(get_valid_moves(board, opponent))
-    score += (my_moves - op_moves) * 5
-    
+    score += (my_moves - op_moves) * 15 # Priorizar movilidad
     return score
 
-def minimax(board: Board, depth: int, alpha: float, beta: float, maximizing: bool, player: Player) -> float:
-    opponent = 'white' if player == 'black' else 'black'
+def minimax(board: Board, depth: int, alpha: float, beta: float, maximizing: bool, ai_player: Player) -> float:
+    human_player = 'black' if ai_player == 'white' else 'white'
+    current_p = ai_player if maximizing else human_player
     
-    valid_moves_max = get_valid_moves(board, player)
-    valid_moves_min = get_valid_moves(board, opponent)
+    moves = get_valid_moves(board, current_p)
     
-    # Condición terminal
-    if depth == 0 or (not valid_moves_max and not valid_moves_min):
-        return evaluate_board(board, player)
-
+    if depth == 0 or not moves:
+        return evaluate_board(board, ai_player)
+    
     if maximizing:
-        if not valid_moves_max:
-            # Pasar turno
-            return minimax(board, depth - 1, alpha, beta, False, player)
-        
         max_eval = float('-inf')
-        for r, c in valid_moves_max:
-            new_board = apply_move(board, player, r, c)
-            eval_val = minimax(new_board, depth - 1, alpha, beta, False, player)
+        for m in moves:
+            new_board = apply_move(board, ai_player, m.row, m.col)
+            eval_val = minimax(new_board, depth - 1, alpha, beta, False, ai_player)
             max_eval = max(max_eval, eval_val)
             alpha = max(alpha, eval_val)
-            if beta <= alpha:
-                break
+            if beta <= alpha: break
         return max_eval
     else:
-        if not valid_moves_min:
-            # Pasar turno
-            return minimax(board, depth - 1, alpha, beta, True, player)
-            
         min_eval = float('inf')
-        for r, c in valid_moves_min:
-            new_board = apply_move(board, opponent, r, c)
-            eval_val = minimax(new_board, depth - 1, alpha, beta, True, player)
+        for m in moves:
+            new_board = apply_move(board, human_player, m.row, m.col)
+            eval_val = minimax(new_board, depth - 1, alpha, beta, True, ai_player)
             min_eval = min(min_eval, eval_val)
             beta = min(beta, eval_val)
-            if beta <= alpha:
-                break
+            if beta <= alpha: break
         return min_eval
 
-def get_best_move(board: Board, player: Player) -> Optional[Tuple[int, int]]:
-    valid_moves = get_valid_moves(board, player)
-    if not valid_moves:
-        return None
-    
-    best_val = float('-inf')
-    best_move = valid_moves[0]
-    
-    # Profundidad 4 es un buen balance para rendimiento en Python
-    MAX_DEPTH = 4 
-    
-    for r, c in valid_moves:
-        new_board = apply_move(board, player, r, c)
-        val = minimax(new_board, MAX_DEPTH - 1, float('-inf'), float('inf'), False, player)
+def get_best_ai_move(board: Board, player: Player) -> Optional[Coordinate]:
+    valid = get_valid_moves(board, player)
+    if not valid: return None
+    best_val, best_move = float('-inf'), valid[0]
+    for m in valid:
+        new_board = apply_move(board, player, m.row, m.col)
+        val = minimax(new_board, 3, float('-inf'), float('inf'), False, player)
         if val > best_val:
-            best_val = val
-            best_move = (r, c)
-            
+            best_val, best_move = val, m
     return best_move
 
-# --- Ayudante para verificar estado del juego ---
-def check_game_state(board: Board, next_player: Player) -> Tuple[bool, Optional[str], Optional[Player]]:
-    """Devuelve (juego_terminado, ganador, siguiente_jugador_real)"""
+def resolve_game_state(board: Board, next_player: Player) -> Tuple[bool, Optional[str], Optional[Player], List[Coordinate]]:
+    moves = get_valid_moves(board, next_player)
+    if moves:
+        return False, None, next_player, moves
     
-    p1_moves = get_valid_moves(board, next_player)
-    
-    if p1_moves:
-        return False, None, next_player
-        
-    # Si el siguiente jugador no tiene movimientos, verificar al otro jugador (Pasar turno)
     other_player = 'white' if next_player == 'black' else 'black'
-    p2_moves = get_valid_moves(board, other_player)
+    other_moves = get_valid_moves(board, other_player)
+    if other_moves:
+        return False, None, other_player, other_moves
     
-    if p2_moves:
-        # Pasar turno de vuelta al otro jugador
-        return False, None, other_player
-    
-    # Ambos sin movimientos -> Fin del Juego
+    # Si nadie puede mover, fin del juego
     counts = count_score(board)
-    if counts['black'] > counts['white']:
-        return True, 'black', None
-    elif counts['white'] > counts['black']:
-        return True, 'white', None
-    else:
-        return True, 'draw', None
+    winner = 'draw'
+    if counts['black'] > counts['white']: winner = 'black'
+    elif counts['white'] > counts['black']: winner = 'white'
+    return True, winner, None, []
 
-# --- Endpoints ---
+# --- Endpoints API ---
 
-@app.post("/partida", response_model=GameState)
+@app.post("/partida", response_model=GameStateResponse)
 async def create_game():
     game_id = str(uuid.uuid4())
     board = create_initial_board()
-    
-    state = GameState(
-        game_id=game_id,
-        board=board,
-        current_player='black',
-        winner=None,
-        game_over=False,
-        score={"black": 2, "white": 2}
+    valid = get_valid_moves(board, 'black')
+    state = GameStateResponse(
+        game_id=game_id, 
+        board=board, 
+        current_player='black', 
+        winner=None, 
+        game_over=False, 
+        score={"black": 2, "white": 2},
+        valid_moves=valid
     )
     games_db[game_id] = state
     return state
 
-@app.post("/movimiento", response_model=GameState)
+@app.post("/movimiento", response_model=GameStateResponse)
 async def make_move(move_req: MoveRequest):
-    game_id = move_req.game_id
-    if game_id not in games_db:
-        raise HTTPException(status_code=404, detail="Partida no encontrada")
+    if move_req.game_id not in games_db: raise HTTPException(status_code=404, detail="Partida no encontrada")
+    game = games_db[move_req.game_id]
     
-    game = games_db[game_id]
-    
-    if game.game_over:
-        raise HTTPException(status_code=400, detail="El juego ha terminado")
-        
-    if move_req.player != game.current_player:
-        raise HTTPException(status_code=400, detail="No es tu turno")
-        
+    if game.game_over: raise HTTPException(status_code=400, detail="El juego ya terminó")
     if not is_valid_move(game.board, move_req.player, move_req.row, move_req.col):
         raise HTTPException(status_code=400, detail="Movimiento inválido")
-        
-    # 1. Aplicar Movimiento Humano
+    
+    # 1. Aplicar movimiento humano
     game.board = apply_move(game.board, move_req.player, move_req.row, move_req.col)
+    game.last_move = Coordinate(row=move_req.row, col=move_req.col)
     
-    # 2. Determinar siguiente paso lógico
-    next_turn_player = 'white' if move_req.player == 'black' else 'black'
-    game_over, winner, actual_next = check_game_state(game.board, next_turn_player)
+    # 2. Determinar quién sigue (o si acabó)
+    next_p = 'white' if move_req.player == 'black' else 'black'
+    over, winner, current, valid = resolve_game_state(game.board, next_p)
     
-    game.game_over = game_over
-    game.winner = winner
-    game.current_player = actual_next
-    game.score = count_score(game.board)
-    
-    # 3. Turno de IA (Si es turno de IA y el juego no ha terminado)
-    # Asumiendo que la IA juega con Blancas
-    if not game.game_over and game.current_player == 'white':
-        ai_move = get_best_move(game.board, 'white')
-        if ai_move:
-            game.board = apply_move(game.board, 'white', ai_move[0], ai_move[1])
-            
-            # Verificar después del movimiento de IA
-            game_over, winner, actual_next_after_ai = check_game_state(game.board, 'black')
-            game.game_over = game_over
-            game.winner = winner
-            game.current_player = actual_next_after_ai
-            game.score = count_score(game.board)
+    game.game_over, game.winner, game.current_player, game.valid_moves, game.score = over, winner, current, valid, count_score(game.board)
 
-    # Guardar y devolver
-    games_db[game_id] = game
+    # 3. Si es el turno de la IA, mover automáticamente
+    if not game.game_over and game.current_player == 'white':
+        ai_move = get_best_ai_move(game.board, 'white')
+        if ai_move:
+            game.board = apply_move(game.board, 'white', ai_move.row, ai_move.col)
+            game.last_move = ai_move
+            # Re-evaluar tras el turno de la IA
+            over, winner, current, valid = resolve_game_state(game.board, 'black')
+            game.game_over, game.winner, game.current_player, game.valid_moves, game.score = over, winner, current, valid, count_score(game.board)
+
+    games_db[move_req.game_id] = game
     return game

@@ -18,9 +18,3 @@ export interface GameState {
   validMoves: Coordinates[];
   lastMove: Coordinates | null;
 }
-
-export enum GameStatus {
-  IDLE = 'IDLE',
-  PLAYING = 'PLAYING',
-  FINISHED = 'FINISHED'
-}

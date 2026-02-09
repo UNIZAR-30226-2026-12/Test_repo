@@ -1,53 +1,33 @@
 import React, { useState, useEffect } from 'react';
-import { GameState, Coordinates } from './types';
-import { getValidMoves } from './services/gameLogic';
+import { GameState } from './types';
 import * as api from './services/api';
 import Board from './components/Board';
 import ScoreBoard from './components/ScoreBoard';
 
 const App: React.FC = () => {
-  const [gameState, setGameState] = useState<GameState>({
-    board: [], // Será llenado por backend/api
-    currentPlayer: 'black',
-    gameOver: false,
-    winner: null,
-    score: { black: 2, white: 2 },
-    validMoves: [],
-    lastMove: null
-  });
-
+  const [gameState, setGameState] = useState<GameState | null>(null);
   const [gameId, setGameId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [isOffline, setIsOffline] = useState(false);
-
-  const syncGameState = (backendState: api.BackendGameState) => {
-    // Calcular movimientos válidos localmente solo para resaltado en UI
-    // El backend (o backend simulado) valida la lógica del movimiento
-    const validMoves = getValidMoves(backendState.board, backendState.current_player);
-    
-    setGameState({
-      board: backendState.board,
-      currentPlayer: backendState.current_player,
-      gameOver: backendState.game_over,
-      winner: backendState.winner,
-      score: backendState.score,
-      validMoves: validMoves,
-      lastMove: gameState.lastMove // Nota: El backend no devuelve la coordenada del último movimiento explícitamente
-    });
-    if (backendState.is_offline_mode) {
-        setIsOffline(true);
-    }
-    setLoading(false);
-  };
+  const [error, setError] = useState<string | null>(null);
 
   const initGame = async () => {
     setLoading(true);
+    setError(null);
     try {
       const data = await api.createGame();
       setGameId(data.game_id);
-      syncGameState(data);
+      setGameState({
+        board: data.board,
+        currentPlayer: data.current_player,
+        gameOver: data.game_over,
+        winner: data.winner,
+        score: data.score,
+        validMoves: data.valid_moves,
+        lastMove: data.last_move || null
+      });
     } catch (err) {
-      console.error("Falló la inicialización del juego incluso con respaldo", err);
+      setError("Error de conexión: Asegúrate de que 'python backend.py' esté corriendo.");
+    } finally {
       setLoading(false);
     }
   };
@@ -57,72 +37,91 @@ const App: React.FC = () => {
   }, []);
 
   const onCellClick = async (row: number, col: number) => {
-    if (!gameId || gameState.currentPlayer !== 'black' || gameState.gameOver || loading) return;
+    if (!gameId || !gameState || gameState.currentPlayer !== 'black' || loading) return;
 
-    // Prevención de interacción UI optimista
     setLoading(true);
-    
     try {
-      const newData = await api.makeMove(gameId, row, col, 'black');
-      
-      // Si el backend manejó el turno de la IA inmediatamente, el estado devuelto tiene el movimiento de la IA aplicado
-      syncGameState(newData);
-      
-      // Actualizar último movimiento para énfasis visual
-      setGameState(prev => ({ ...prev, lastMove: { row, col } }));
-
+      const data = await api.makeMove(gameId, row, col, 'black');
+      setGameState({
+        board: data.board,
+        currentPlayer: data.current_player,
+        gameOver: data.game_over,
+        winner: data.winner,
+        score: data.score,
+        validMoves: data.valid_moves,
+        lastMove: data.last_move || null
+      });
     } catch (err: any) {
-      alert(err.message || "Error al realizar movimiento");
+      console.error(err);
+      setError("Se perdió la conexión con el servidor.");
+    } finally {
       setLoading(false);
     }
   };
 
-  if (loading && !gameState.board.length) {
+  if (error) {
     return (
-        <div className="flex items-center justify-center min-h-screen bg-stone-900 text-white">
-            <div className="animate-pulse flex flex-col items-center">
-                <div className="w-12 h-12 bg-green-500 rounded-full mb-4"></div>
-                <p>Conectando...</p>
-            </div>
+      <div className="flex items-center justify-center min-h-screen bg-stone-950 p-6">
+        <div className="max-w-md w-full bg-stone-900 border border-red-500/20 p-10 rounded-3xl text-center shadow-2xl">
+          <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
+            <div className="w-2 h-2 bg-red-500 rounded-full animate-ping"></div>
+          </div>
+          <h2 className="text-2xl font-black text-white mb-2 uppercase tracking-tighter">Sin Conexión</h2>
+          <p className="text-stone-400 mb-8 text-sm leading-relaxed">{error}</p>
+          <button 
+            onClick={initGame} 
+            className="w-full py-4 bg-white text-black font-black rounded-2xl uppercase text-xs tracking-[0.2em] hover:bg-stone-200 transition-all active:scale-95"
+          >
+            Reintentar Conexión
+          </button>
         </div>
+      </div>
+    );
+  }
+
+  if (loading && !gameState) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-stone-950">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-2 border-stone-800 border-t-green-500 rounded-full animate-spin"></div>
+          <p className="text-stone-500 text-[10px] uppercase font-bold tracking-[0.5em]">Sincronizando...</p>
+        </div>
+      </div>
     );
   }
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-stone-900 text-stone-100 p-4">
-      <div className="mb-8 text-center relative">
-        <h1 className="text-4xl md:text-5xl font-bold text-green-500 mb-2 tracking-tight">Reversi</h1>
-        <p className="text-stone-400 text-sm max-w-md mx-auto">
-          {isOffline 
-            ? <span className="text-amber-400 font-mono">MODO OFFLINE (Backend No Disponible)</span> 
-            : <span className="text-green-400 font-mono">ONLINE (Backend Python Conectado)</span>
-          }
-        </p>
-      </div>
+    <div className="flex flex-col items-center justify-center min-h-screen bg-stone-950 text-stone-100 p-4 select-none">
+      <header className="mb-12 text-center">
+        <h1 className="text-5xl font-black tracking-tighter uppercase italic text-white">
+          REVERSI<span className="text-green-500 not-italic">.</span>AI
+        </h1>
+        <div className="flex items-center justify-center gap-2 mt-2 opacity-50">
+          <div className="w-1.5 h-1.5 rounded-full bg-green-500"></div>
+          <p className="text-[9px] uppercase tracking-[0.3em] font-bold">FastAPI Backend Online</p>
+        </div>
+      </header>
 
-      <div className="flex flex-col lg:flex-row items-center lg:items-start gap-12">
-        <Board 
-          board={gameState.board} 
-          validMoves={gameState.validMoves}
-          lastMove={gameState.lastMove}
-          onCellClick={onCellClick}
-          disabled={gameState.currentPlayer !== 'black' || gameState.gameOver || loading}
-        />
-        
-        <ScoreBoard 
-          score={gameState.score}
-          currentPlayer={gameState.currentPlayer}
-          gameOver={gameState.gameOver}
-          winner={gameState.winner}
-          onReset={initGame}
-          aiThinking={loading && gameState.currentPlayer === 'white'}
-        />
-      </div>
-      
-      <div className="fixed bottom-4 right-4 text-xs text-stone-600 max-w-xs text-right hidden md:block">
-        <p>Para ejecutar Backend Python:</p>
-        <code className="bg-stone-800 px-1 rounded">uvicorn backend:app --reload</code>
-      </div>
+      {gameState && (
+        <div className="flex flex-col lg:flex-row items-center gap-16 max-w-6xl w-full justify-center">
+          <Board 
+            board={gameState.board} 
+            validMoves={gameState.validMoves}
+            lastMove={gameState.lastMove}
+            onCellClick={onCellClick}
+            disabled={gameState.currentPlayer !== 'black' || gameState.gameOver || loading}
+          />
+          
+          <ScoreBoard 
+            score={gameState.score}
+            currentPlayer={gameState.currentPlayer}
+            gameOver={gameState.gameOver}
+            winner={gameState.winner}
+            onReset={initGame}
+            aiThinking={loading && gameState.currentPlayer === 'white'}
+          />
+        </div>
+      )}
     </div>
   );
 };
