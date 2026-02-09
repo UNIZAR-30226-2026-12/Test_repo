@@ -1,20 +1,54 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# Reversi (Othello) con IA Minimax
 
-# Run and deploy your AI Studio app
+Este proyecto es una implementación completa del juego de mesa Reversi (Othello). Cuenta con una arquitectura híbrida única que permite jugar tanto conectado a un backend de Python como en modo totalmente offline en el navegador.
 
-This contains everything you need to run your app locally.
+**IMPORTANTE:** Este proyecto **NO** requiere ninguna API Key de Google ni servicios de terceros. La inteligencia artificial es un algoritmo lógico (Minimax con poda Alfa-Beta) que se ejecuta localmente.
 
-View your app in AI Studio: https://ai.studio/apps/drive/1IUGOsBT_bqIR_8tnxNx-zUxZ7pCXeI7Z
+## Tecnologías
 
-## Run Locally
+- **Frontend:** React, TypeScript, Tailwind CSS.
+- **Backend:** Python, FastAPI, Pydantic.
+- **IA:** Algoritmo Minimax con Poda Alfa-Beta (implementado tanto en Python como en TypeScript para redundancia).
 
-**Prerequisites:**  Node.js
+## Cómo ejecutar el proyecto
 
+### 1. Frontend (La interfaz del juego)
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+Para iniciar la aplicación web:
+
+```bash
+# Instalar dependencias de Node.js
+npm install
+
+# Iniciar el servidor de desarrollo
+npm run dev
+```
+
+Abre tu navegador en `http://localhost:5173` (o el puerto que indique la consola).
+
+*Nota: Si solo ejecutas este paso, el juego funcionará en "Modo Offline" usando la IA integrada en el navegador.*
+
+### 2. Backend (Lógica en Python) - Opcional
+
+Si deseas que la lógica y la IA sean procesadas por el servidor de Python (como se solicitó originalmente):
+
+1. Asegúrate de tener Python instalado.
+2. Instala las dependencias necesarias:
+
+```bash
+pip install fastapi uvicorn pydantic
+```
+
+3. Ejecuta el servidor:
+
+```bash
+uvicorn backend:app --reload
+```
+
+El servidor correrá en `http://localhost:8000`.
+
+## ¿Cómo funciona la conexión?
+
+El Frontend está programado para intentar conectarse automáticamente a `http://localhost:8000`. 
+- Si el backend de Python está activo, las jugadas se procesan allí.
+- Si el backend NO está activo (o falla la conexión), el juego cambia silenciosamente a la lógica interna de TypeScript (Modo Offline) para que puedas seguir jugando sin interrupciones.
