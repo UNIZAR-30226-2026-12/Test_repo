@@ -1,1 +1,5 @@
+<<<<<<< HEAD
 Hola soy Alejo y hago cambio online
+=======
+Hola soy Izan y hago cambio local
+>>>>>>> c93e16d162992f531246fcaf6497ca0f617bc135
