@@ -17,9 +17,9 @@ const Disc: React.FC<DiscProps> = ({ player, isRecent }) => {
 
   return (
     <div className={`w-[80%] h-[80%] rounded-full ${colorClass} relative transition-all duration-300 transform animate-in fade-in zoom-in`}>
-        {/* Subtle bevel/shine */}
+        {/* Bisel/brillo sutil */}
         <div className="absolute top-[10%] left-[10%] w-[30%] h-[20%] rounded-full bg-white opacity-10 blur-sm"></div>
-        {/* Recent move indicator */}
+        {/* Indicador de movimiento reciente */}
         {isRecent && (
             <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 rounded-full ${indicatorClass}`}></div>
         )}

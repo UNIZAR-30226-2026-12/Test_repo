@@ -7,7 +7,7 @@ import copy
 
 app = FastAPI(title="Reversi AI Backend")
 
-# Enable CORS for frontend communication
+# Habilitar CORS para comunicación con el frontend
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -16,13 +16,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- Types & Constants ---
+# --- Tipos y Constantes ---
 Player = Literal['black', 'white']
 Cell = Optional[Player]
 Board = List[List[Cell]]
 BOARD_SIZE = 8
 
-# Position weights for Heuristic Evaluation
+# Pesos de posición para evaluación heurística
 POSITION_WEIGHTS = [
     [100, -20, 10, 5, 5, 10, -20, 100],
     [-20, -50, -2, -2, -2, -2, -50, -20],
@@ -40,12 +40,12 @@ DIRECTIONS = [
     (1, -1),  (1, 0),  (1, 1)
 ]
 
-# --- Models ---
+# --- Modelos ---
 
 class GameState(BaseModel):
     game_id: str
     board: Board
-    current_player: Optional[Player] # None if game over
+    current_player: Optional[Player] # None si el juego terminó
     winner: Optional[str] # 'black', 'white', 'draw', None
     game_over: bool
     score: Dict[str, int]
@@ -56,10 +56,10 @@ class MoveRequest(BaseModel):
     col: int
     player: Player
 
-# --- In-Memory Storage ---
+# --- Almacenamiento en Memoria ---
 games_db: Dict[str, GameState] = {}
 
-# --- Game Logic Functions ---
+# --- Funciones de Lógica del Juego ---
 
 def create_initial_board() -> Board:
     board = [[None for _ in range(BOARD_SIZE)] for _ in range(BOARD_SIZE)]
@@ -99,7 +99,7 @@ def is_valid_move(board: Board, player: Player, row: int, col: int) -> bool:
                 if found_opponent:
                     return True
                 break
-            else: # cell is None
+            else: # celda vacía
                 break
             r += dr
             c += dc
@@ -133,7 +133,7 @@ def count_score(board: Board) -> Dict[str, int]:
     white = sum(row.count('white') for row in board)
     return {"black": black, "white": white}
 
-# --- AI Logic (Minimax + Alpha Beta) ---
+# --- Lógica de IA (Minimax + Poda Alfa-Beta) ---
 
 def evaluate_board(board: Board, player: Player) -> int:
     opponent = 'white' if player == 'black' else 'black'
@@ -142,7 +142,7 @@ def evaluate_board(board: Board, player: Player) -> int:
     counts = count_score(board)
     total_discs = counts['black'] + counts['white']
     
-    # Position weights
+    # Pesos posicionales
     for r in range(BOARD_SIZE):
         for c in range(BOARD_SIZE):
             if board[r][c] == player:
@@ -150,7 +150,7 @@ def evaluate_board(board: Board, player: Player) -> int:
             elif board[r][c] == opponent:
                 score -= POSITION_WEIGHTS[r][c]
     
-    # Mobility
+    # Movilidad
     my_moves = len(get_valid_moves(board, player))
     op_moves = len(get_valid_moves(board, opponent))
     score += (my_moves - op_moves) * 5
@@ -163,13 +163,13 @@ def minimax(board: Board, depth: int, alpha: float, beta: float, maximizing: boo
     valid_moves_max = get_valid_moves(board, player)
     valid_moves_min = get_valid_moves(board, opponent)
     
-    # Terminal condition
+    # Condición terminal
     if depth == 0 or (not valid_moves_max and not valid_moves_min):
         return evaluate_board(board, player)
 
     if maximizing:
         if not valid_moves_max:
-            # Pass turn
+            # Pasar turno
             return minimax(board, depth - 1, alpha, beta, False, player)
         
         max_eval = float('-inf')
@@ -183,7 +183,7 @@ def minimax(board: Board, depth: int, alpha: float, beta: float, maximizing: boo
         return max_eval
     else:
         if not valid_moves_min:
-            # Pass turn
+            # Pasar turno
             return minimax(board, depth - 1, alpha, beta, True, player)
             
         min_eval = float('inf')
@@ -204,7 +204,7 @@ def get_best_move(board: Board, player: Player) -> Optional[Tuple[int, int]]:
     best_val = float('-inf')
     best_move = valid_moves[0]
     
-    # Depth 4 is a good balance for Reversi performance in Python
+    # Profundidad 4 es un buen balance para rendimiento en Python
     MAX_DEPTH = 4 
     
     for r, c in valid_moves:
@@ -216,24 +216,24 @@ def get_best_move(board: Board, player: Player) -> Optional[Tuple[int, int]]:
             
     return best_move
 
-# --- Helper to Check Game Over ---
+# --- Ayudante para verificar estado del juego ---
 def check_game_state(board: Board, next_player: Player) -> Tuple[bool, Optional[str], Optional[Player]]:
-    """Returns (is_game_over, winner, next_actual_player)"""
+    """Devuelve (juego_terminado, ganador, siguiente_jugador_real)"""
     
     p1_moves = get_valid_moves(board, next_player)
     
     if p1_moves:
         return False, None, next_player
         
-    # If next player has no moves, check the other player (Pass turn)
+    # Si el siguiente jugador no tiene movimientos, verificar al otro jugador (Pasar turno)
     other_player = 'white' if next_player == 'black' else 'black'
     p2_moves = get_valid_moves(board, other_player)
     
     if p2_moves:
-        # Pass turn back to other player
+        # Pasar turno de vuelta al otro jugador
         return False, None, other_player
     
-    # Both have no moves -> Game Over
+    # Ambos sin movimientos -> Fin del Juego
     counts = count_score(board)
     if counts['black'] > counts['white']:
         return True, 'black', None
@@ -277,10 +277,10 @@ async def make_move(move_req: MoveRequest):
     if not is_valid_move(game.board, move_req.player, move_req.row, move_req.col):
         raise HTTPException(status_code=400, detail="Movimiento inválido")
         
-    # 1. Apply Human Move
+    # 1. Aplicar Movimiento Humano
     game.board = apply_move(game.board, move_req.player, move_req.row, move_req.col)
     
-    # 2. Determine next logic step
+    # 2. Determinar siguiente paso lógico
     next_turn_player = 'white' if move_req.player == 'black' else 'black'
     game_over, winner, actual_next = check_game_state(game.board, next_turn_player)
     
@@ -289,20 +289,20 @@ async def make_move(move_req: MoveRequest):
     game.current_player = actual_next
     game.score = count_score(game.board)
     
-    # 3. AI Turn (If it's AI's turn and game is not over)
-    # Assuming AI plays White
+    # 3. Turno de IA (Si es turno de IA y el juego no ha terminado)
+    # Asumiendo que la IA juega con Blancas
     if not game.game_over and game.current_player == 'white':
         ai_move = get_best_move(game.board, 'white')
         if ai_move:
             game.board = apply_move(game.board, 'white', ai_move[0], ai_move[1])
             
-            # Check after AI move
+            # Verificar después del movimiento de IA
             game_over, winner, actual_next_after_ai = check_game_state(game.board, 'black')
             game.game_over = game_over
             game.winner = winner
             game.current_player = actual_next_after_ai
             game.score = count_score(game.board)
 
-    # Save and return
+    # Guardar y devolver
     games_db[game_id] = game
     return game

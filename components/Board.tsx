@@ -22,7 +22,7 @@ const Board: React.FC<BoardProps> = ({ board, validMoves, lastMove, onCellClick,
 
   return (
     <div className="relative p-3 bg-stone-800 rounded-lg shadow-2xl shadow-black">
-      {/* Board Border */}
+      {/* Borde del Tablero */}
       <div className="grid grid-cols-8 gap-1 bg-green-900 p-1 border-4 border-stone-700 rounded shadow-inner">
         {board.map((row, rowIndex) => (
           <React.Fragment key={rowIndex}>
@@ -38,13 +38,13 @@ const Board: React.FC<BoardProps> = ({ board, validMoves, lastMove, onCellClick,
                     ${valid && !disabled ? 'cursor-pointer hover:bg-green-600' : ''}
                   `}
                 >
-                  {/* Grid Position Markers (Optional styling) */}
-                  {/* Valid Move Indicator */}
+                  {/* Marcadores de posición de la cuadrícula (estilo opcional) */}
+                  {/* Indicador de movimiento válido */}
                   {valid && !disabled && (
                     <div className="absolute w-3 h-3 bg-green-900/40 rounded-full animate-pulse border border-green-800/50"></div>
                   )}
 
-                  {/* Disc */}
+                  {/* Ficha */}
                   <Disc player={cell} isRecent={isRecent(rowIndex, colIndex)} />
                 </div>
               );
@@ -53,7 +53,7 @@ const Board: React.FC<BoardProps> = ({ board, validMoves, lastMove, onCellClick,
         ))}
       </div>
       
-      {/* Coordinate Labels - Optional visual flair */}
+      {/* Etiquetas de coordenadas - Estilo visual opcional */}
       <div className="absolute -left-6 top-5 flex flex-col justify-between h-[90%] text-stone-500 text-xs font-mono hidden md:flex">
         {[1,2,3,4,5,6,7,8].map(n => <span key={n}>{n}</span>)}
       </div>

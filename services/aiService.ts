@@ -12,7 +12,7 @@ const evaluateBoard = (board: BoardState, player: Player): number => {
   const counts = countScore(board);
   const totalDiscs = counts.black + counts.white;
 
-  // 1. Positional Strategy (Static Weights)
+  // 1. Estrategia Posicional (Pesos Estáticos)
   for (let r = 0; r < BOARD_SIZE; r++) {
     for (let c = 0; c < BOARD_SIZE; c++) {
       if (board[r][c] === player) score += POSITION_WEIGHTS[r][c];
@@ -20,11 +20,11 @@ const evaluateBoard = (board: BoardState, player: Player): number => {
     }
   }
 
-  // 2. Mobility (Number of valid moves)
+  // 2. Movilidad (Número de movimientos válidos)
   const myMoves = getValidMoves(board, player).length;
   const opMoves = getValidMoves(board, opponent).length;
   
-  // Late game optimization: prioritize disc count over position slightly more as game ends
+  // Optimización de juego tardío: priorizar conteo de fichas sobre posición ligeramente más al final del juego
   if (totalDiscs > 50) {
       score += (player === 'black' ? counts.black - counts.white : counts.white - counts.black) * 10;
   } else {
@@ -43,7 +43,7 @@ export const getBestMove = async (board: BoardState, player: Player): Promise<Co
   const alpha = -Infinity;
   const beta = Infinity;
 
-  // Simple heuristic sort to improve pruning could go here
+  // Ordenamiento heurístico simple para mejorar la poda podría ir aquí
   
   for (const move of validMoves) {
     const newBoard = makeMove(board, player, move.row, move.col);
@@ -76,7 +76,7 @@ const minimax = (
   const validMoves = getValidMoves(board, currentPlayer);
 
   if (validMoves.length === 0) {
-    // If no moves, pass turn (recurse without changing board but decrease depth)
+    // Si no hay movimientos, pasar turno (recursión sin cambiar tablero pero disminuyendo profundidad)
     return minimax(board, depth - 1, alpha, beta, !isMaximizing, aiPlayer);
   }
 

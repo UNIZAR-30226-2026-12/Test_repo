@@ -7,7 +7,7 @@ import ScoreBoard from './components/ScoreBoard';
 
 const App: React.FC = () => {
   const [gameState, setGameState] = useState<GameState>({
-    board: [], // Will be filled by backend/api
+    board: [], // Será llenado por backend/api
     currentPlayer: 'black',
     gameOver: false,
     winner: null,
@@ -21,8 +21,8 @@ const App: React.FC = () => {
   const [isOffline, setIsOffline] = useState(false);
 
   const syncGameState = (backendState: api.BackendGameState) => {
-    // Calculate valid moves locally for UI highlighting only
-    // The backend (or mock backend) validates the move logic
+    // Calcular movimientos válidos localmente solo para resaltado en UI
+    // El backend (o backend simulado) valida la lógica del movimiento
     const validMoves = getValidMoves(backendState.board, backendState.current_player);
     
     setGameState({
@@ -32,7 +32,7 @@ const App: React.FC = () => {
       winner: backendState.winner,
       score: backendState.score,
       validMoves: validMoves,
-      lastMove: gameState.lastMove // Note: Backend doesn't return last move coord explicitly
+      lastMove: gameState.lastMove // Nota: El backend no devuelve la coordenada del último movimiento explícitamente
     });
     if (backendState.is_offline_mode) {
         setIsOffline(true);
@@ -47,7 +47,7 @@ const App: React.FC = () => {
       setGameId(data.game_id);
       syncGameState(data);
     } catch (err) {
-      console.error("Failed to init game even with fallback", err);
+      console.error("Falló la inicialización del juego incluso con respaldo", err);
       setLoading(false);
     }
   };
@@ -59,20 +59,20 @@ const App: React.FC = () => {
   const onCellClick = async (row: number, col: number) => {
     if (!gameId || gameState.currentPlayer !== 'black' || gameState.gameOver || loading) return;
 
-    // Optimistic UI interaction prevention
+    // Prevención de interacción UI optimista
     setLoading(true);
     
     try {
       const newData = await api.makeMove(gameId, row, col, 'black');
       
-      // If the backend handled the AI turn immediately, the returned state has the AI move applied
+      // Si el backend manejó el turno de la IA inmediatamente, el estado devuelto tiene el movimiento de la IA aplicado
       syncGameState(newData);
       
-      // Update last move for visual emphasis 
+      // Actualizar último movimiento para énfasis visual
       setGameState(prev => ({ ...prev, lastMove: { row, col } }));
 
     } catch (err: any) {
-      alert(err.message || "Error making move");
+      alert(err.message || "Error al realizar movimiento");
       setLoading(false);
     }
   };
@@ -82,7 +82,7 @@ const App: React.FC = () => {
         <div className="flex items-center justify-center min-h-screen bg-stone-900 text-white">
             <div className="animate-pulse flex flex-col items-center">
                 <div className="w-12 h-12 bg-green-500 rounded-full mb-4"></div>
-                <p>Connecting...</p>
+                <p>Conectando...</p>
             </div>
         </div>
     );
@@ -94,8 +94,8 @@ const App: React.FC = () => {
         <h1 className="text-4xl md:text-5xl font-bold text-green-500 mb-2 tracking-tight">Reversi</h1>
         <p className="text-stone-400 text-sm max-w-md mx-auto">
           {isOffline 
-            ? <span className="text-amber-400 font-mono">OFFLINE MODE (Backend Unreachable)</span> 
-            : <span className="text-green-400 font-mono">ONLINE (Python Backend Connected)</span>
+            ? <span className="text-amber-400 font-mono">MODO OFFLINE (Backend No Disponible)</span> 
+            : <span className="text-green-400 font-mono">ONLINE (Backend Python Conectado)</span>
           }
         </p>
       </div>
@@ -120,7 +120,7 @@ const App: React.FC = () => {
       </div>
       
       <div className="fixed bottom-4 right-4 text-xs text-stone-600 max-w-xs text-right hidden md:block">
-        <p>To run Python Backend:</p>
+        <p>Para ejecutar Backend Python:</p>
         <code className="bg-stone-800 px-1 rounded">uvicorn backend:app --reload</code>
       </div>
     </div>

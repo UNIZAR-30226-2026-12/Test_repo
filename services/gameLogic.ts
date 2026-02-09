@@ -66,7 +66,7 @@ export const makeMove = (board: BoardState, player: Player, row: number, col: nu
       if (cell !== player) {
         potentialFlips.push({ row: r, col: c });
       } else {
-        // Found our own piece, flip the opponents in between
+        // Encontramos nuestra propia ficha, volteamos las de los oponentes en medio
         for (const flip of potentialFlips) {
           newBoard[flip.row][flip.col] = player;
         }

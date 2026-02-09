@@ -6,7 +6,7 @@ export const DIRECTIONS = [
   [1, -1],  [1, 0],  [1, 1]
 ];
 
-// Weights for the AI heuristic evaluation
+// Pesos para la evaluación heurística de la IA
 export const POSITION_WEIGHTS = [
   [100, -20, 10, 5, 5, 10, -20, 100],
   [-20, -50, -2, -2, -2, -2, -50, -20],
